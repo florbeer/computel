@@ -1,0 +1,165 @@
+---
+title: "ATAC-Seq telomeric repeats"
+author: "Franziska Lorbeer"
+date: "7/25/2019"
+output: html_document
+---
+
+### Output generated from computel package 
+
+```{r setup, include=FALSE}
+library(gdata)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(tidyverse)
+library(readxl)
+theme_set(theme_linedraw()) 
+knitr::opts_knit$set(root.dir = '/Users/Franziska/git_code/computel')
+```
+
+```{r, echo = FALSE}
+kRootDir <- '/Users/Franziska/git_code/computel'
+
+#function setting up naming system for finding 
+#files to analyze and extracting information on case
+SplitPath <- function(path){
+  split_path <- stringr::str_split(path, "/")
+  samples <- purrr::map_chr(split_path, function(x) {
+    tail(x, n = 2)[1]
+  })
+  setNames(path, samples)
+}
+
+#function to read in files 
+SummarizeFile <- function(path, ...) {
+  df <- read_excel(path)
+  return(df)
+}
+
+```
+
+```{r, echo = FALSE}
+# making the list of files for variant tables
+filelist_var = SplitPath(
+  list.files(kRootDir, pattern = "tel.variants.xlsx", 
+             recursive = TRUE, full.names = TRUE))
+
+#reading in variant file and combining in one data frame
+df_var <- purrr::map_df(filelist_var, SummarizeFile, .id = "SampleName")
+
+#get sample annotation
+SampleAnno <- read_excel(paste(kRootDir, "SampleAnno.xlsx", sep="/"))
+
+df_var <- df_var %>%
+  dplyr::left_join(SampleAnno,df_var, by = "SampleName") 
+
+```
+### Plotting the relative total telomeric content derived by "computel"  
+Computel calculates a relative number of telomeric content that can be used for telomere length calculation from WGS data.  
+It is normalized to the total read coverage of the whole genome, the genome size and the read length.  
+Plotted here is this "relative telomere content number". It shows no difference between telomeric reads vs. non-telomeric reads.
+```{r, echo = FALSE, warning = FALSE}
+SampleAnno %>%
+  ggplot(aes(y= Telocontent, x = SampleName)) + 
+  geom_bar(stat = "identity", aes(fill = factor(Genotype))) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+SampleAnno %>%
+  ggplot(aes(y= Telocontent, x = Genotype)) + 
+  geom_bar(stat = "identity", aes(fill = factor(Genotype))) +
+  facet_wrap(~Cell) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+## Analysis of the frequency of patterns  
+Plotted are the patterns that occur >200x in one of the samples on a log scale as % of all patterns.  
+Most frequent in all samples is "TTAGGG" with ~97% (for comparison that is  detected >500000x).  
+
+```{r, echo = FALSE, fig.width=10, warning = FALSE}
+df_var %>%
+  dplyr::filter(df_var$`abs num` > 200) %>%
+  ggplot(aes(y= `% of all patterns`, x = pattern, fill = SampleName)) + 
+  ggtitle("Frequency of all patterns") +
+  geom_point(stat = "identity", aes(fill = factor(Genotype)), shape=21, size = 2) +
+  scale_y_continuous(trans = scales::log10_trans())+
+  facet_wrap(~ SampleName) +
+  theme(text = element_text(size=8), axis.text.x = element_text(angle = 60, hjust = 1))
+
+```
+
+We can compare hES and Fib or ATRX vs. WT cells
+```{r, echo = FALSE, fig.width=10, warning = FALSE}
+df_var %>%
+  dplyr::filter(df_var$`abs num` > 200) %>%
+  ggplot(aes(y= `% of all patterns`, x = pattern, fill = SampleName)) + 
+  ggtitle("Frequency of all patterns") +
+  geom_point(stat = "identity", aes(fill = factor(Genotype)), shape=21, size = 2) +
+  scale_y_continuous(trans = scales::log10_trans())+
+  facet_wrap(~ Cell) +
+  theme(text = element_text(size=8), axis.text.x = element_text(angle = 60, hjust = 1))
+
+df_var %>%
+  dplyr::filter(df_var$`abs num` > 200) %>%
+  ggplot(aes(y= `% of all patterns`, x = pattern, fill = Cell)) + 
+  ggtitle("Frequency of all patterns") +
+  geom_point(stat = "identity", aes(fill = factor(Cell)), shape=21, size = 2) +
+  scale_y_continuous(trans = scales::log10_trans())+
+  facet_wrap(~ Genotype) +
+  theme(text = element_text(size=8), axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+## Plotting the % of non-TTAGGG variants
+Cut-off is set to detected >200x 
+```{r, echo = FALSE, fig.width=10, warning = FALSE}
+df_var %>%
+  dplyr::filter(df_var$`abs num` > 200) %>%
+  ggplot(aes(y= `% of variants`, x = pattern, fill = SampleName)) + 
+  ggtitle("Frequency of variants") +
+  geom_point(stat = "identity", aes(fill = factor(Genotype)), shape=21, size = 2) +
+  scale_y_continuous(trans = scales::log10_trans())+
+  facet_wrap(~ SampleName) +
+  theme(text = element_text(size=8), axis.text.x = element_text(angle = 60, hjust = 1))
+
+```
+We can compare hES and Fib or ATRX vs. WT cells
+```{r, echo = FALSE, fig.width=10, warning = FALSE}
+df_var %>%
+  dplyr::filter(df_var$`abs num` > 200) %>%
+  ggplot(aes(y= `% of variants`, x = pattern, fill = SampleName)) + 
+  ggtitle("Frequency of variants") +
+  geom_point(stat = "identity", aes(fill = factor(Genotype)), shape=21, size = 2) +
+  scale_y_continuous(trans = scales::log10_trans())+
+  facet_wrap(~ Cell) +
+  theme(text = element_text(size=8), axis.text.x = element_text(angle = 60, hjust = 1))
+
+df_var %>%
+  dplyr::filter(df_var$`abs num` > 200) %>%
+  ggplot(aes(y= `% of variants`, x = pattern, fill = Cell)) + 
+  ggtitle("Frequency of variants") +
+  geom_point(stat = "identity", aes(fill = factor(Cell)), shape=21, size = 2) +
+  scale_y_continuous(trans = scales::log10_trans())+
+  facet_wrap(~ Genotype) +
+  theme(text = element_text(size=8), axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+## and plot it as a histogram...
+```{r, echo = FALSE, fig.width=10, warning = FALSE}
+df_var %>%
+  dplyr::filter(df_var$`abs num` > 200) %>%
+  ggplot(aes(y= `% of variants`, x = pattern, fill = SampleName)) + 
+  ggtitle("Frequency of variants") +
+  geom_bar(stat = "identity", aes(fill = factor(Genotype)), shape=21, size = 2) +
+  #scale_y_continuous(trans = scales::log2_trans())+
+  facet_wrap(~ Cell) +
+  theme(text = element_text(size=8), axis.text.x = element_text(angle = 60, hjust = 1))
+
+df_var %>%
+  dplyr::filter(df_var$`abs num` > 200) %>%
+  ggplot(aes(y= `% of variants`, x = pattern)) + 
+  ggtitle("Frequency of variants") +
+  geom_bar(stat = "identity", aes(fill = factor(Cell)), shape=21, size = 2) +
+  #scale_y_continuous(trans = scales::log2_trans())+
+  facet_wrap(~ Genotype) +
+  theme(text = element_text(size=8), axis.text.x = element_text(angle = 60, hjust = 1))
+```
